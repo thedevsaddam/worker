@@ -10,23 +10,33 @@ import (
 	"syscall"
 )
 
+const (
+	defaultConcurrency = 2
+)
+
 // Worker represents a background worker type
 type Worker struct {
-	id          uint64
-	queue       []func()  // list of functions
-	concurrency uint      // no concurrent task
-	jobs        chan bool // jobs
-	stop        chan os.Signal
+	option option
+	id     uint64
+	queue  []func()  // list of functions
+	jobs   chan bool // jobs
+	stop   chan os.Signal
 }
 
 // New return a Worker instance
-func New(concurrency uint) *Worker {
-	return &Worker{
-		queue:       make([]func(), 0),
-		concurrency: concurrency,
-		jobs:        make(chan bool, concurrency),
-		stop:        make(chan os.Signal, 1),
+func New(options ...OptionFunc) *Worker {
+	w := &Worker{
+		queue: make([]func(), 0),
+		jobs:  make(chan bool, defaultConcurrency),
+		stop:  make(chan os.Signal, 1),
 	}
+	for _, option := range options {
+		if err := option(w); err != nil {
+			w.option.logger.Printf("worker: %s", err.Error())
+		}
+	}
+
+	return w
 }
 
 // Register add a new task to the worker

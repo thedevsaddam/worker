@@ -9,7 +9,7 @@ import (
 
 func main() {
 
-	b := worker.New(2)
+	b := worker.New()
 	go func() {
 		// run background worker
 		b.Run()
