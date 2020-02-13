@@ -1,14 +1,12 @@
 package worker
 
-import "log"
-
 // OptionFunc represents a contract for option func, it basically set options to Worker instance options
 type OptionFunc func(*Worker) error
 
 // option describes type for providing configuration options to Worker
 type option struct {
-	concurrency bool
-	lebug       bool
+	concurrency uint
+	debug       bool
 	logger      Logger
 }
 
@@ -23,7 +21,7 @@ func WithConcurrency(c uint) OptionFunc {
 // WithDebug enable debug mode
 func WithDebug() OptionFunc {
 	return func(w *Worker) error {
-		w.option.lebug = true
+		w.option.debug = true
 		return nil
 	}
 }

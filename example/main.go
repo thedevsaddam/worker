@@ -10,11 +10,8 @@ import (
 func main() {
 
 	b := worker.New()
-	go func() {
-		// run background worker
-		b.Run()
-	}()
-	duration := 2 * time.Second
+
+	duration := 10 * time.Second
 
 	log.Println("Enqueue task 1")
 	b.Register(func() {
@@ -65,5 +62,6 @@ func main() {
 		log.Println("completed: witcher 7")
 	})
 
-	time.Sleep(20 * time.Second)
+	// run background worker
+	b.Run()
 }
