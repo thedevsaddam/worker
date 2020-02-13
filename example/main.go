@@ -9,7 +9,7 @@ import (
 
 func main() {
 
-	b := worker.New()
+	b := worker.New(worker.WithConcurrency(2), worker.WithDebug())
 
 	duration := 10 * time.Second
 
