@@ -13,7 +13,7 @@ func main() {
 	logger := log.New(os.Stderr, "XXX", log.Ltime)
 	b := worker.New(worker.WithConcurrency(2), worker.WithDebug(), worker.WithLogger(logger))
 
-	duration := 10 * time.Second
+	duration := 1 * time.Second
 
 	log.Println("Enqueue task 1")
 	b.Register(func() {
