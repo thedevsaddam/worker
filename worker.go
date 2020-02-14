@@ -78,13 +78,13 @@ func (w *Worker) Run() {
 		select {
 
 		case <-w.stop:
-			close(w.jobs)
-			close(w.stop)
-
 			fmt.Println()
 			fmt.Println(strings.Repeat("-", 40))
 			fmt.Println("| Shutting down background job worker! |")
 			fmt.Println(strings.Repeat("-", 40))
+
+			close(w.jobs)
+			close(w.stop)
 
 			os.Exit(0)
 
