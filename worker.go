@@ -74,16 +74,18 @@ func (w *Worker) Run() {
 
 	signal.Notify(w.stop, syscall.SIGKILL, syscall.SIGINT, syscall.SIGQUIT)
 	for {
+
 		select {
 
 		case <-w.stop:
+			close(w.jobs)
+			close(w.stop)
+
 			fmt.Println()
 			fmt.Println(strings.Repeat("-", 40))
 			fmt.Println("| Shutting down background job worker! |")
 			fmt.Println(strings.Repeat("-", 40))
 
-			close(w.jobs)
-			close(w.stop)
 			os.Exit(0)
 
 		default:
@@ -106,5 +108,6 @@ func (w *Worker) Run() {
 			}
 
 		}
+
 	}
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"os"
 	"time"
 
 	"github.com/thedevsaddam/worker"
@@ -9,7 +10,8 @@ import (
 
 func main() {
 
-	b := worker.New(worker.WithConcurrency(2), worker.WithDebug())
+	logger := log.New(os.Stderr, "XXX", log.Ltime)
+	b := worker.New(worker.WithConcurrency(2), worker.WithDebug(), worker.WithLogger(logger))
 
 	duration := 10 * time.Second
 
