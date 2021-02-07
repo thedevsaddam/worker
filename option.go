@@ -1,10 +1,13 @@
-package worker
+package gworker
+
+import "github.com/go-redis/redis/v8"
 
 // OptionFunc represents a contract for option func, it basically set options to Worker instance options
 type OptionFunc func(*Worker) error
 
 // option describes type for providing configuration options to Worker
 type option struct {
+	redisClient *redis.Client
 	concurrency uint
 	debug       bool
 	logger      Logger

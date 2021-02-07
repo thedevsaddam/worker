@@ -1,4 +1,4 @@
-package worker
+package gworker
 
 // Logger ...
 type Logger interface {
