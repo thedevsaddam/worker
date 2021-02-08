@@ -29,12 +29,13 @@ var c = redis.NewClient(&redis.Options{
 
 // Worker represents a background worker type
 type Worker struct {
-	mu     *sync.Mutex
-	name   string
-	jobs   map[string]reflect.Value // jobs
-	stop   chan os.Signal           // register worker to os signals
-	limit  chan struct{}            // track concurrency limit
-	option option
+	mu      *sync.Mutex
+	name    string
+	jobs    chan *Job                // track concurrency limit
+	jobFunc map[string]reflect.Value // jobs
+	stop    chan os.Signal           // register worker to os signals
+	process chan struct{}
+	option  option
 }
 
 // New return a Worker instance
@@ -46,20 +47,18 @@ func New(name string, options ...OptionFunc) *Worker {
 	}
 
 	w := &Worker{
-		mu:     &sync.Mutex{},
-		option: defaultOptions,
-		stop:   make(chan os.Signal, 1),
-		limit:  make(chan struct{}, defaultConcurrency),
-		jobs:   make(map[string]reflect.Value),
+		mu:      &sync.Mutex{},
+		option:  defaultOptions,
+		stop:    make(chan os.Signal, 1),
+		jobFunc: make(map[string]reflect.Value),
+		jobs:    make(chan *Job, 1),
+		process: make(chan struct{}, 100),
 	}
 
 	for _, option := range options {
 		if err := option(w); err != nil {
 			w.option.logger.Printf("%s: %s", packageName, err.Error())
 		}
-	}
-	if w.option.concurrency > 0 {
-		w.limit = make(chan struct{}, w.option.concurrency)
 	}
 
 	w.name = name
@@ -70,7 +69,7 @@ func New(name string, options ...OptionFunc) *Worker {
 // RegisterJob add a new task to the worker
 func (w *Worker) RegisterJob(name string, fn interface{}) error {
 
-	if _, exist := w.jobs[name]; exist {
+	if _, exist := w.jobFunc[name]; exist {
 		return ErrJobConflict
 	}
 
@@ -86,7 +85,7 @@ func (w *Worker) RegisterJob(name string, fn interface{}) error {
 		return ErrInvalidJobReturn
 	}
 
-	w.jobs[name] = vfn
+	w.jobFunc[name] = vfn
 
 	return nil
 }
@@ -97,24 +96,41 @@ func (w *Worker) SendJob(j *Job) error {
 	if err != nil {
 		return err
 	}
-	return w.option.redisClient.LPush(ctx, fmt.Sprintf("%s:%s", packageName, w.name), b).Err()
+	return w.option.redisClient.RPush(ctx, fmt.Sprintf("%s:%s", packageName, w.name), b).Err()
+}
+
+func (w *Worker) listenMessages() {
+	for {
+		result, err := w.option.redisClient.BLPop(ctx, 1*time.Second, fmt.Sprintf("%s:%s", packageName, w.name)).Result()
+		if err != nil {
+			if err != redis.Nil {
+				log.Println(err)
+			}
+		}
+		if result != nil {
+			w.process <- struct{}{}
+			j := &Job{}
+			if err := json.Unmarshal([]byte(result[1]), j); err == nil {
+				w.jobs <- j
+			}
+		}
+	}
 }
 
 // Run start the backgournd worker for processing jobs
 func (w *Worker) Run() {
-
-	// fLog := func(format string, v ...interface{}) {
-	// 	if w.option.debug {
-	// 		w.option.logger.Printf(format, v...)
-	// 	}
-	// }
 
 	fmt.Println()
 	fmt.Println(strings.Repeat("-", 34))
 	fmt.Println("| Backgound job worker started...|")
 	fmt.Println(strings.Repeat("-", 34))
 
+	go func(lw *Worker) {
+		w.listenMessages()
+	}(w)
+
 	signal.Notify(w.stop, syscall.SIGKILL, syscall.SIGINT, syscall.SIGQUIT)
+
 	for {
 
 		select {
@@ -125,40 +141,27 @@ func (w *Worker) Run() {
 			fmt.Println("| Shutting down background job worker! |")
 			fmt.Println(strings.Repeat("-", 40))
 
-			close(w.limit)
+			close(w.jobs)
 			close(w.stop)
 
 			os.Exit(0)
 
-		default:
-			w.limit <- struct{}{}
-			go func() {
-				for { //TODO:: in cofusion
-					result, err := w.option.redisClient.BRPop(ctx, 1*time.Second, fmt.Sprintf("%s:%s", packageName, w.name)).Result()
-					if err != nil {
-						if err != redis.Nil {
-							log.Println(err)
-						}
+		case j := <-w.jobs:
+			if j != nil {
+				go func(job Job) {
+					in := make([]reflect.Value, 0)
+					for _, a := range job.Args {
+						in = append(in, reflect.ValueOf(a.Value))
 					}
-					if result != nil {
-						j := Job{}
-						json.Unmarshal([]byte(result[1]), &j)
-						in := make([]reflect.Value, 0)
-						for _, a := range j.Args {
-							in = append(in, reflect.ValueOf(a.Value))
-						}
 
-						// call the fn with arguments
-						out := []interface{}{}
-						for _, o := range w.jobs[j.Name].Call(in) {
-							out = append(out, o.Interface())
-						}
+					// call the fn with arguments
+					out := []interface{}{}
+					for _, o := range w.jobFunc[job.Name].Call(in) {
+						out = append(out, o.Interface())
 					}
-				}
-				<-w.limit
-
-			}()
+					<-w.process
+				}(*j)
+			}
 		}
-
 	}
 }
