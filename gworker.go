@@ -27,6 +27,10 @@ var c = redis.NewClient(&redis.Options{
 	Addr: "localhost:6379",
 })
 
+// var cc = redis.NewClusterClient(&redis.ClusterOptions{
+// 	Addrs: []string{":7000", ":7001", ":7002", ":7003", ":7004", ":7005"},
+// })
+
 // Worker represents a background worker type
 type Worker struct {
 	mu      *sync.Mutex

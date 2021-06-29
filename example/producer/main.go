@@ -8,7 +8,7 @@ import (
 
 func main() {
 	w := gworker.New("emailer")
-	for i := 1; i <= 100; i++ {
+	for i := 1; i <= 10; i++ {
 		fmt.Println("sending job", i)
 		w.SendJob(&gworker.Job{
 			Name: "send_email",
